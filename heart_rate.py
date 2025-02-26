@@ -30,11 +30,13 @@ class HeartRate:
 			self.__samples.pop(0)
 			self.__timestamps.pop(0)
 			self.__filtered_samples.pop(0)
+
+		self.__heart_rate = self.__calculate_heart_rate()
 		
 	def get(self) -> int:
 		if not self.__presence():
 			return -1
-		return self.__calculate_heart_rate()
+		return self.__heart_rate
 	
 	def __presence(self) -> bool:
 		if len(self.__filtered_samples) < self.__MOVING_AVERAGE_WINDOW:
