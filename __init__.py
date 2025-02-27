@@ -1,5 +1,3 @@
-# This module is based on: https://github.com/n-elia/MAX30102-MicroPython-driver
-
 import smbus
 import time
 from collections import deque
@@ -122,6 +120,9 @@ class MAX30102:
 		self.shutdown()
 
 	class CircularBuffer(object):
+		"""
+			Simple circular buffer implementation.
+		"""
 		def __init__(self, max_size):
 			self.data = deque((), max_size)
 			self.max_size = max_size
@@ -159,11 +160,20 @@ class MAX30102:
 			return temp.popleft()
 
 	class SensorData:
+		"""
+			Structure to store the sensor data.
+		"""
 		def __init__(self):
 			self.red = MAX30102.CircularBuffer(STORAGE_QUEUE_SIZE)
 			self.ir = MAX30102.CircularBuffer(STORAGE_QUEUE_SIZE)
 
 	def get_address(self) -> int:
+		"""
+			Get the I2C address of the MAX30102 sensor.
+
+			Returns:
+				int: The I2C address of the sensor.
+		"""
 		return self.__address
 
 	def setup_sensor(self, 
@@ -174,6 +184,22 @@ class MAX30102:
 				  pulse_width: int = MAX30102_PULSE_WIDTH_411,
 				  pulse_amplitude: int = MAX30102_PULSE_AMP_MEDIUM,
 	) -> None:
+		"""
+			Setup the MAX30102 sensor.
+			
+			Parameters:
+				sample_rate (int): The sample rate of the sensor.
+				led_mode (int): The mode of the LED.
+				adc_range (int): The ADC range of the sensor.
+				sample_avg (int): The sample average of the sensor.
+				pulse_width (int): The pulse width of the sensor.
+				pulse_amplitude (int): The pulse amplitude of the sensor.
+
+			Returns:
+				None
+
+			NOTE: The default values are set to the recommended values for heart rate and SpO2 measurement.
+		"""
 		self.soft_reset()
 		self.set_fifo_average(sample_avg)
 		self.enable_fifo_rollover()
@@ -186,22 +212,49 @@ class MAX30102:
 		self.clear_fifo()
 
 	def soft_reset(self, timeout: float = 1.0) -> None:
+		"""
+			Soft reset the MAX30102 sensor.
+
+			Parameters:
+				timeout (float): The timeout for the reset operation.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_MODE_CONFIG, MAX30102_RESET_MASK, MAX30102_RESET)
 		start_time = time.time()
 		reset_status = -1
 		while not ((reset_status & MAX30102_RESET) == 0):
 			if time.time() - start_time > timeout:
-				break
+				raise TimeoutError("Soft reset timeout.")
 			time.sleep(0.01)
 			reset_status = self.__i2c_read_reg(MAX30102_MODE_CONFIG)[0]
 
 	def shutdown(self) -> None:
+		"""
+			Shutdown the MAX30102 sensor.
+			
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_MODE_CONFIG, MAX30102_SHUTDOWN_MASK, MAX30102_SHUTDOWN)
 
 	def wakeup(self) -> None:
+		"""
+			Wakeup the MAX30102 sensor.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_MODE_CONFIG, MAX30102_SHUTDOWN_MASK, MAX30102_WAKEUP)
 
 	def read_temperature(self) -> float:
+		"""
+			Read the temperature from the MAX30102 sensor.
+
+			Returns:
+				float: The temperature in degree celsius.
+		"""
 		self.__i2c_write_reg(MAX30102_DIE_TEMP_CONFIG, 0x01)
 
 		read = self.__i2c_read_reg(MAX30102_INT_STATUS_2)[0]
@@ -216,6 +269,12 @@ class MAX30102:
 		return float(temp_int) + (float(temp_frac) * 0.0625)
 	
 	def available(self) -> bool:
+		"""
+			Check if the MAX30102 sensor has data available in the FIFO.
+
+			Returns:
+				bool: True if data is available, False otherwise.
+		"""			
 		read_pointer = self.get_read_pointer()
 		write_pointer = self.get_write_pointer()
 
@@ -242,35 +301,99 @@ class MAX30102:
 			return False
 
 	def get_red(self) -> int:
+		"""
+			Get the Red LED data from the MAX30102 sensor.
+			
+			Returns:
+				int: The Red LED data.
+		"""
 		return self.__pop_red_from_storage()
 	
 	def get_ir(self) -> int:
+		"""
+			Get the IR LED data from the MAX30102 sensor.
+			
+			Returns:
+				int: The IR LED data.
+		"""
 		return self.__pop_ir_from_storage()
 	
 	def get_read_pointer(self) -> int:
+		"""
+			Get the read pointer of the FIFO from the MAX30102 sensor.
+
+			Returns:
+				int: The read pointer.
+		"""
 		return self.__i2c_read_reg(MAX30102_FIFO_READ_PTR)[0]
 	
 	def get_write_pointer(self) -> int:
+		"""
+			Get the write pointer of the FIFO from the MAX30102 sensor.
+
+			Returns:
+				int: The write pointer.
+		"""
 		return self.__i2c_read_reg(MAX30102_FIFO_WRITE_PTR)[0]
 
 	def get_sample_rate(self) -> int:
+		"""
+			Get the sample rate of the MAX30102 sensor.
+
+			Returns:
+				int: The sample rate.
+		"""
 		return self.__sample_rate if self.__sample_rate is not None else 0
 	
 	def get_sample_avg(self) -> int:
+		"""
+			Get the sample average of the MAX30102 sensor.
+
+			Returns:
+				int: The sample average.
+		"""
 		return self.__sample_average if self.__sample_average is not None else 0
 
 	def clear_fifo(self) -> None:
+		"""
+			Clear the FIFO of the MAX30102 sensor.
+
+			Returns:
+				None
+		"""
 		self.__i2c_write_reg(MAX30102_FIFO_WRITE_PTR, 0x00)
 		self.__i2c_write_reg(MAX30102_FIFO_READ_PTR, 0x00)
 		self.__i2c_write_reg(MAX30102_FIFO_OVERFLOW_COUNTER, 0x00)
 
 	def enable_fifo_rollover(self) -> None:
+		"""
+			Enable the FIFO rollover of the MAX30102 sensor.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_FIFO_CONFIG, MAX30102_ROLLOVER_MASK, MAX30102_ROLLOVER_ENABLE)
 
 	def disable_fifo_rollover(self) -> None:
+		"""
+			Disable the FIFO rollover of the MAX30102 sensor.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_FIFO_CONFIG, MAX30102_ROLLOVER_MASK, MAX30102_ROLLOVER_DISABLE)
 	
 	def enable_slot(self, slot_number: int, led: int) -> None:
+		"""
+			Enable the slot of the MAX30102 sensor.
+
+			Parameters:
+				slot_number (int): The slot number.
+				led (int): The LED to be enabled.
+			
+			Returns:
+				None
+		"""
 		if slot_number == 1:
 			self.__bitmask(MAX30102_MULTI_LED_MODE_CONTROL1, MAX30102_SLOT1_MASK, led)
 		elif slot_number == 2:
@@ -283,10 +406,25 @@ class MAX30102:
 			raise ValueError(f"Invalid slot number: {slot_number}")
 
 	def disable_slot(self) -> None:
+		"""
+			Disable the slot of the MAX30102 sensor.
+
+			Returns:
+				None	
+		"""
 		self.__i2c_write_reg(MAX30102_MULTI_LED_MODE_CONTROL1, 0x00)
 		self.__i2c_write_reg(MAX30102_MULTI_LED_MODE_CONTROL2, 0x00)
 
 	def set_led_mode(self, mode: int) -> None:
+		"""
+			Set the LED mode of the MAX30102 sensor.
+
+			Parameters:
+				mode (int): The mode of the LED.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_MODE_CONFIG, MAX30102_MODE_MASK, mode)
 
 		self.enable_slot(1, SLOT_RED_LED)
@@ -302,6 +440,15 @@ class MAX30102:
 		self.__active_leds = mode
 
 	def set_fifo_average(self, sample_avg: int) -> None:
+		"""
+			Set the sample average of the MAX30102 sensor.
+			
+			Parameters:
+				sample_avg (int): The sample average.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_FIFO_CONFIG, MAX30102_SAMPLE_AVG_MASK, sample_avg)
 
 		if sample_avg == MAX30102_SAMPLE_AVG_1:
@@ -322,6 +469,15 @@ class MAX30102:
 		self.update_acquisition_frequency()
 
 	def set_sample_rate(self, sample_rate: int) -> None:
+		"""
+			Set the sample rate of the MAX30102 sensor.
+
+			Parameters:
+				sample_rate (int): The sample rate.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_SPO2_CONFIG, MAX30102_SAMPLE_RATE_MASK, sample_rate)
 
 		if sample_rate == MAX30102_SAMPLE_RATE_50:
@@ -346,6 +502,12 @@ class MAX30102:
 		self.update_acquisition_frequency()
 
 	def update_acquisition_frequency(self) -> None:
+		"""
+			Update the acquisition frequency of the MAX30102 sensor.
+
+			Returns:
+				None
+		"""
 		if self.__sample_rate is not None and self.__sample_average is not None:
 			self.__acquisition_frequency = int(self.__sample_rate / self.__sample_average)
 			
@@ -353,15 +515,50 @@ class MAX30102:
 			self.__acquisition_frequency_inverse = int(ceil(1000 / self.__acquisition_frequency))
 
 	def get_acquisition_frequency(self) -> int:
+		"""
+			Get the acquisition frequency of the MAX30102 sensor.
+
+			Returns:
+				int: The acquisition frequency from sample rate and sample average in Hz.
+
+			NOTE: Return 0 if the acquisition frequency is not available.
+		"""
 		return self.__acquisition_frequency if self.__acquisition_frequency is not None else 0
 
 	def set_fifo_almost_full(self, number_of_samples: int) -> None:
+		"""
+			Set the FIFO almost full of the MAX30102 sensor.
+
+			Parameters:
+				number_of_samples (int): The number of samples.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_FIFO_CONFIG, MAX30102_A_FULL_MASK, number_of_samples)
 
 	def set_adc_range(self, adc_range: int) -> None:
+		"""
+			Set the ADC range of the MAX30102 sensor.
+
+			Parameters:
+				adc_range (int): The ADC range.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_SPO2_CONFIG, MAX30102_ADC_RANGE_MASK, adc_range)
 
 	def set_pulse_width(self, pulse_width: int) -> None:
+		"""
+			Set the pulse width of the MAX30102 sensor.
+
+			Parameters:
+				pulse_width (int): The pulse width.
+
+			Returns:
+				None
+		"""
 		self.__set_bitmask(MAX30102_SPO2_CONFIG, MAX30102_PULSE_WIDTH_MASK, pulse_width)
 
 		if pulse_width == MAX30102_PULSE_WIDTH_69:
@@ -374,51 +571,103 @@ class MAX30102:
 			self.__pulse_width = 411
 
 	def set_active_leds_amplitude(self, amplitude: int) -> None:
+		"""
+			Set the active LEDs amplitude of the MAX30102 sensor.
+
+			Parameters:
+				amplitude (int): The amplitude.
+
+			Returns:
+				None
+		"""
 		self.set_led_pulse_amplitude_red(amplitude)
 		if self.__active_leds is not None and self.__active_leds > MAX30102_MODE_RED_ONLY:
 			self.set_led_pulse_amplitude_ir(amplitude)
 
 	def set_led_pulse_amplitude_red(self, amplitude: int) -> None:
+		"""
+			Set the Red LED pulse amplitude of the MAX30102 sensor.
+
+			Parameters:
+				amplitude (int): The amplitude from 0 to 255 (0x00 to 0xFF).
+
+			Returns:
+				None
+		"""
 		self.__i2c_write_reg(MAX30102_LED1_PULSE_AMPLITUDE, amplitude)
 
 	def set_led_pulse_amplitude_ir(self, amplitude: int) -> None:
+		"""
+			Set the IR LED pulse amplitude of the MAX30102 sensor.
+
+			Parameters:
+				amplitude (int): The amplitude from 0 to 255 (0x00 to 0xFF).
+
+			Returns:
+				None
+		"""
 		self.__i2c_write_reg(MAX30102_LED2_PULSE_AMPLITUDE, amplitude)
 
 	def read_part_id(self) -> int:
+		"""
+			Read the part ID of the MAX30102 sensor.
+
+			Returns:
+				int: The part ID.
+		"""
 		return self.__i2c_read_reg(MAX30102_PART_ID)[0]
 
 	def check_part_id(self) -> bool:
+		"""
+			Check the part ID of the MAX30102 sensor.
+
+			Returns:
+				bool: True if the part ID is correct, False otherwise.
+		"""
 		return self.read_part_id() == MAX30102_EXPECTED_PART_ID
 	
 	def read_revision_id(self) -> int:
+		"""
+			Read the revision ID of the MAX30102 sensor.
+
+			Returns:
+				int: The revision ID.
+		"""
 		return self.__i2c_read_reg(MAX30102_REVISION_ID)[0]
 
 	def __pop_red_from_storage(self) -> int:
+		"""Pop the Red LED data from the storage."""
 		if len(self.__sensor_data.red) == 0:
 			return 0
 		else:
 			return self.__sensor_data.red.pop()
 		
 	def __pop_ir_from_storage(self) -> int:
+		"""Pop the IR LED data from the storage."""
 		if len(self.__sensor_data.ir) == 0:
 			return 0
 		else:
 			return self.__sensor_data.ir.pop()
 
 	def __fifo_bytes_to_int(self, fifo_bytes: list) -> int:
+		"""Convert the FIFO bytes to integer."""
 		return (fifo_bytes[0] << 16) | (fifo_bytes[1] << 8) | fifo_bytes[2]
 
 	def __set_bitmask(self, reg: int, mask: int, value: int) -> None:
+		"""Set the bitmask, read it, mask it, and write it."""
 		data = (self.__i2c_read_reg(reg)[0] & mask) | value
 		self.__i2c_write_reg(reg, data)
 
 	def __bitmask(self, reg: int, mask: int, value: int) -> None:
+		"""Bitmask the data and write it."""
 		data = self.__i2c_read_reg(reg)[0]
 		data = (data & mask) | value
 		self.__i2c_write_reg(reg, data)
 
 	def __i2c_read_reg(self, reg: int, length: int = 1) -> list:
+		"""Read the I2C register."""
 		return self.__i2c.read_i2c_block_data(self.__address, reg, length)
 
 	def __i2c_write_reg(self, reg: int, data: int) -> None:
+		"""Write the I2C register."""
 		self.__i2c.write_i2c_block_data(self.__address, reg, [data])
