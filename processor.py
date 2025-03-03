@@ -5,9 +5,9 @@ class Processor:
 		Processor class for the MAX30102 sensor to calculate heart rate and oxygen saturation. 
 	"""
 	def __init__(self, frequency: int):
-		self._MOVING_AVERAGE_WINDOW: int = 5
+		self._MOVING_AVERAGE_WINDOW: int = 10
 		self.__ADAPTIVE_FACTOR: float = 0.8
-		self.__PRESENCE_THRESHOLD: int = 10
+		self.__PRESENCE_THRESHOLD: int = 11
 
 		self._frequency: int = frequency
 		self._timestamps: list = []

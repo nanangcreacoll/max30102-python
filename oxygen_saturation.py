@@ -69,17 +69,28 @@ class OxygenSaturation(Processor):
 		self._ratios.extend(ratios)
 		self._ratios = self._ratios[-self._processed_window_size:]
 
-		if len(self._ratios) < 2:
-			return self.__oxygen_saturation
-		
-		average_ratio = sum(self._ratios) / len(self._ratios)
-
-		"""
-			SpO2 = a * Ratio^2 / 10000 + b * Ratio / 100 + c
-			a = -45.060
-			b = 30.354
-			c = 94.845
-		"""
-		self.__oxygen_saturation = int(-45.060 * ((average_ratio**2) / 10000.0) + 30.054 * (average_ratio / 100.0) + 94.845)
+		if len(self._ratios) > 1:
+			average_ratio = sum(self._ratios[-self._MOVING_AVERAGE_WINDOW:]) / self._MOVING_AVERAGE_WINDOW
+			# return min(100, max(0, self.__oxygen_saturation_equation(average_ratio)))
+			return self.__oxygen_saturation_equation(average_ratio)
 		
 		return self.__oxygen_saturation
+
+	
+	def __oxygen_saturation_equation(self, ratio: float) -> int:
+		"""
+			Calculate the oxygen saturation using the ratio.
+			
+			Parameters:
+				ratio (float): The ratio of the RED and IR samples.
+
+			Returns:
+				int: The oxygen saturation in percentage.
+
+			NOTE: The equation is SpO2 = a * Ratio^2 + b * Ratio + c
+		"""
+		a = -25.060
+		b = 40.231
+		c = 94.845
+
+		return int(a * (ratio**2) + (b * ratio) + c)

@@ -47,7 +47,7 @@ class HeartRate(Processor):
 		self._intervals = self._intervals[-self._processed_window_size:]
 
 		if len(self._intervals) > 1:
-			average_interval = sum(self._intervals) / len(self._intervals)
-			self.__heart_rate = int(60 / average_interval)
+			average_interval = sum(self._intervals[-self._MOVING_AVERAGE_WINDOW:]) / self._MOVING_AVERAGE_WINDOW
+			return int(60 / average_interval)
 		
 		return self.__heart_rate
